@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Planning Poker</title>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      text-align: center;
+    }
+    input, button {
+      padding: 10px;
+      margin: 6px;
+      width: 90%;
+    }
+    .cards button {
+      width: 60px;
+      margin: 5px;
+    }
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>🃏 Planning Poker</h2>
+
+  <input id="name" placeholder="Your name" />
+
+  <div class="cards">
+    <button onclick="vote(1)">1</button>
+    <button onclick="vote(2)">2</button>
+    <button onclick="vote(3)">3</button>
+    <button onclick="vote(5)">5</button>
+    <button onclick="vote(8)">8</button>
+    <button onclick="vote(13)">13</button>
+  </div>
+
+  <p id="status"></p>
+
+  <ul id="results"></ul>
+
+  <button onclick="reset()">Reset</button>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    // 🔴 REPLACE WITH YOUR RENDER URL
+    const socket = io("https://planning-poker-server-oouw.onrender.com");
+
+    let userName = "";
+
+    document.getElementById("name").addEventListener("change", (e) => {
+      userName = e.target.value;
+      socket.emit("join", userName);
+    });
+
+    function vote(value) {
+      if (!userName) {
+        alert("Enter your name first");
+        return;
+      }
+      socket.emit("vote", { name: userName, effort: value });
+      document.getElementById("status").innerText =
+        "Vote submitted. Waiting for others...";
+    }
+
+    socket.on("reveal", (votes) => {
+      const list = document.getElementById("results");
+      list.innerHTML = "";
+      Object.entries(votes).forEach(([name, effort]) => {
+        const li = document.createElement("li");
+        li.innerText = `${name}: ${effort}`;
+        list.appendChild(li);
+      });
+      document.getElementById("status").innerText = "🎉 Revealed!";
+    });
+
+    function reset() {
+      socket.emit("reset");
+    }
+
+    socket.on("reset", () => {
+      document.getElementById("results").innerHTML = "";
+      document.getElementById("status").innerText = "";
+    });
+  </script>
+</body>
+</html>
