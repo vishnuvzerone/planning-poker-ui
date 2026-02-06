@@ -1,92 +1,235 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Planning Poker</title>
   <meta charset="UTF-8" />
+  <title>Planning Poker</title>
+
   <style>
     body {
-      font-family: Arial, sans-serif;
-      max-width: 500px;
-      margin: 40px auto;
-      text-align: center;
+      font-family: Inter, Arial, sans-serif;
+      background: #f7f8fa;
+      margin: 0;
+      padding: 30px;
     }
-    input, button {
+
+    h2 {
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    input {
       padding: 10px;
-      margin: 6px;
-      width: 90%;
+      width: 250px;
+      font-size: 14px;
+      margin-bottom: 20px;
     }
-    .cards button {
-      width: 60px;
-      margin: 5px;
+
+    /* Cards */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 12px;
+      max-width: 650px;
+      margin-bottom: 20px;
     }
+
+    .card {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      height: 80px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .card:hover {
+      border-color: #888;
+    }
+
+    .card.selected {
+      background: #5f6c7b;
+      color: white;
+      border-color: #5f6c7b;
+    }
+
     #status {
-      margin-top: 15px;
-      font-weight: bold;
+      margin: 12px 0;
+      font-weight: 500;
+    }
+
+    /* Controls */
+    .controls {
+      margin: 20px 0;
+    }
+
+    button {
+      padding: 10px 16px;
+      margin-right: 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .reveal {
+      background: #4a90e2;
+      color: white;
+    }
+
+    .danger {
+      background: #d9534f;
+      color: white;
+    }
+
+    /* Table */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 650px;
+      background: white;
+      margin-top: 10px;
+    }
+
+    th, td {
+      border-bottom: 1px solid #eee;
+      padding: 12px;
+      text-align: left;
+    }
+
+    th {
+      background: #fafafa;
+      font-weight: 600;
     }
   </style>
 </head>
 
 <body>
-  <h2>🃏 Planning Poker</h2>
+
+  <h2>Provide an effort estimate</h2>
+  <div class="subtitle">
+    Choose one of the cards to estimate the story complexity.
+  </div>
 
   <input id="name" placeholder="Your name" />
 
-  <div class="cards">
-    <button onclick="vote(1)">1</button>
-    <button onclick="vote(2)">2</button>
-    <button onclick="vote(3)">3</button>
-    <button onclick="vote(5)">5</button>
-    <button onclick="vote(8)">8</button>
-    <button onclick="vote(13)">13</button>
+  <!-- Cards -->
+  <div class="cards" id="cards"></div>
+
+  <div id="status"></div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="reveal" onclick="reveal()">Reveal</button>
+    <button class="danger" onclick="reset()">Delete Estimates</button>
   </div>
 
-  <p id="status"></p>
-
-  <ul id="results"></ul>
-
-  <button onclick="reset()">Reset</button>
+  <!-- Results -->
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Story Points</th>
+      </tr>
+    </thead>
+    <tbody id="results"></tbody>
+  </table>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-    // 🔴 REPLACE WITH YOUR RENDER URL
+    // 🔴 Your Render WebSocket URL
     const socket = io("https://planning-poker-server-oouw.onrender.com");
 
-    let userName = "";
+    const cardValues = ["?", "☕", 0, 0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100];
+    const cardsDiv = document.getElementById("cards");
+    const resultsBody = document.getElementById("results");
+    const statusEl = document.getElementById("status");
 
-    document.getElementById("name").addEventListener("change", (e) => {
+    let userName = "";
+    let selectedCard = null;
+
+    // Create cards
+    cardValues.forEach(value => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerText = value;
+
+      card.onclick = () => vote(value, card);
+      cardsDiv.appendChild(card);
+    });
+
+    document.getElementById("name").addEventListener("change", e => {
       userName = e.target.value;
       socket.emit("join", userName);
     });
 
-    function vote(value) {
+    function vote(value, element) {
       if (!userName) {
-        alert("Enter your name first");
+        alert("Please enter your name first");
         return;
       }
+
+      document.querySelectorAll(".card").forEach(c =>
+        c.classList.remove("selected")
+      );
+
+      element.classList.add("selected");
+      selectedCard = value;
+
       socket.emit("vote", { name: userName, effort: value });
-      document.getElementById("status").innerText =
-        "Vote submitted. Waiting for others...";
+      statusEl.innerText = "Estimate submitted. Waiting for others…";
     }
 
-    socket.on("reveal", (votes) => {
-      const list = document.getElementById("results");
-      list.innerHTML = "";
-      Object.entries(votes).forEach(([name, effort]) => {
-        const li = document.createElement("li");
-        li.innerText = `${name}: ${effort}`;
-        list.appendChild(li);
-      });
-      document.getElementById("status").innerText = "🎉 Revealed!";
-    });
+    function reveal() {
+      socket.emit("reveal");
+    }
 
     function reset() {
       socket.emit("reset");
     }
 
+    function showResults(votes) {
+      resultsBody.innerHTML = "";
+      Object.entries(votes).forEach(([name, effort]) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${name}</td><td>${effort}</td>`;
+        resultsBody.appendChild(row);
+      });
+    }
+
+    // 🔥 Rehydrate state on refresh
+    socket.on("state", ({ votes, revealed }) => {
+      if (revealed) {
+        showResults(votes);
+        statusEl.innerText = "Estimates already revealed";
+      } else {
+        statusEl.innerText = "Waiting for estimates…";
+      }
+    });
+
+    socket.on("reveal", votes => {
+      showResults(votes);
+      statusEl.innerText = "All estimates revealed 🎉";
+    });
+
     socket.on("reset", () => {
-      document.getElementById("results").innerHTML = "";
-      document.getElementById("status").innerText = "";
+      resultsBody.innerHTML = "";
+      statusEl.innerText = "";
+      selectedCard = null;
+      document.querySelectorAll(".card").forEach(c =>
+        c.classList.remove("selected")
+      );
     });
   </script>
+
 </body>
 </html>
